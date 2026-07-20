@@ -227,6 +227,13 @@ void startWiFi() {
   Serial.println(WiFi.localIP());
 }
 
+
+bool otaAvailable() {
+    return WiFi.status() == WL_CONNECTED &&
+           !(WiFi.getMode() & WIFI_AP);
+}
+
+
 void setup() {
   Serial.begin(115200);
   delay(200);
@@ -256,7 +263,11 @@ void setup() {
 
   startWiFi();
 
-  setupOTA();
+  
+  if (otaAvailable()) {
+    	setupOTA();
+  }
+
 	
   setupTime();
   fetchWeather();
@@ -268,7 +279,11 @@ void setup() {
 
 void loop() {
 
-  ArduinoOTA.handle()
+  
+	if (otaAvailable()) {
+    	ArduinoOTA.handle();
+	}
+
 	
   server.handleClient();
 
