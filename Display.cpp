@@ -1,7 +1,9 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <TFT_eSPI.h>
 #include <time.h>
+#include <esp_arduino_version.h>
+
+#include "LGFX_Config.h"
 
 struct AppSettings {
   String city;
@@ -23,7 +25,7 @@ struct WeatherData {
   String updatedAt;
 };
 
-extern TFT_eSPI tft;
+extern LGFX tft;
 extern AppSettings settings;
 extern WeatherData weather;
 
@@ -31,34 +33,51 @@ static String lastDrawnTime = "";
 static String lastDrawnDate = "";
 static String lastDrawnWeather = "";
 static String lastDrawnIp = "";
+static bool brightnessReady = false;
 
 void applyBrightness() {
-  // ESP32 Arduino LEDC API changed in newer cores. analogWrite works on current ESP32 Arduino cores.
-  // If your core is older and analogWrite is unavailable, replace with ledcSetup/ledcAttachPin/ledcWrite.
-  pinMode(21, OUTPUT);
-  analogWrite(21, settings.brightness);
+  uint8_t duty = constrain(settings.brightness, 20, 255);
+
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  // ESP32 Arduino Core 3.x LEDC API
+  if (!brightnessReady) {
+    ledcAttach(TFT_BL_PIN, 5000, 8);
+    brightnessReady = true;
+  }
+  ledcWrite(TFT_BL_PIN, duty);
+#else
+  // ESP32 Arduino Core 2.x LEDC API
+  const int backlightChannel = 0;
+  if (!brightnessReady) {
+    ledcSetup(backlightChannel, 5000, 8);
+    ledcAttachPin(TFT_BL_PIN, backlightChannel);
+    brightnessReady = true;
+  }
+  ledcWrite(backlightChannel, duty);
+#endif
 }
 
 void drawBootScreen(const String& message) {
   tft.fillScreen(TFT_BLACK);
-  tft.setTextDatum(MC_DATUM);
+  tft.setTextDatum(middle_center);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.drawString("ESP32 Clock", 160, 88, 4);
+  tft.drawString("ESP32 Clock", 160, 88, &fonts::Font4);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString(message, 160, 130, 2);
+  tft.drawString(message, 160, 130, &fonts::Font2);
 }
 
 void drawStatusScreen(const String& line1, const String& line2) {
   tft.fillScreen(TFT_BLACK);
-  tft.setTextDatum(MC_DATUM);
+  tft.setTextDatum(middle_center);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.drawString(line1, 160, 100, 4);
+  tft.drawString(line1, 160, 100, &fonts::Font4);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawString(line2, 160, 140, 2);
+  tft.drawString(line2, 160, 140, &fonts::Font2);
 }
 
 static String formatTime(const struct tm& timeinfo) {
   char buf[16];
+
   if (settings.use24Hour) {
     strftime(buf, sizeof(buf), "%H:%M:%S", &timeinfo);
   } else {
@@ -67,6 +86,7 @@ static String formatTime(const struct tm& timeinfo) {
       memmove(buf, buf + 1, strlen(buf));
     }
   }
+
   return String(buf);
 }
 
@@ -104,31 +124,34 @@ void drawClockScreen() {
     tft.drawRoundRect(6, 6, 308, 116, 10, TFT_DARKGREY);
     tft.drawRoundRect(6, 130, 308, 82, 10, TFT_DARKGREY);
 
-    tft.setTextDatum(MC_DATUM);
+    tft.setTextDatum(middle_center);
+
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString(dateLine, 160, 104, 2);
+    tft.drawString(dateLine, 160, 104, &fonts::Font2);
 
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawString(settings.city, 160, 146, 4);
+    tft.drawString(settings.city, 160, 146, &fonts::Font4);
 
     tft.setTextColor(weather.valid ? TFT_GREEN : TFT_ORANGE, TFT_BLACK);
-    tft.drawString(weatherLine, 160, 180, 2);
+    tft.drawString(weatherLine, 160, 180, &fonts::Font2);
 
     if (weather.valid) {
       String rainLine = "Today rain: " + String(weather.rainSum, 1) + " mm  Updated: " + weather.updatedAt;
       tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-      tft.drawString(rainLine, 160, 200, 2);
+      tft.drawString(rainLine, 160, 200, &fonts::Font2);
     }
 
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString(ipLine, 160, 228, 2);
+    tft.drawString(ipLine, 160, 228, &fonts::Font2);
   }
 
   if (lastDrawnTime != timeLine || fullRedraw) {
     tft.fillRect(15, 30, 290, 58, TFT_BLACK);
-    tft.setTextDatum(MC_DATUM);
+    tft.setTextDatum(middle_center);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
-    tft.drawString(timeLine, 160, 62, 7);
+
+    // Font7 gives large clock digits similar to the TFT_eSPI version.
+    tft.drawString(timeLine, 160, 62, &fonts::Font7);
   }
 
   lastDrawnTime = timeLine;
