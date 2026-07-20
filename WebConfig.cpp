@@ -3,6 +3,7 @@
 #include <WiFiManager.h>
 #include <WebServer.h>
 #include <Preferences.h>
+#include "tz_lookup.h"
 
 struct AppSettings {
   String city;
@@ -96,17 +97,39 @@ void handleRoot() {
   String html = pageHeader("ESP32 Clock Setup");
 
   html += "<div class='card'><form method='POST' action='/save'>";
+  
+	
+  html += "<label>Search city</label>";
+  html += "<input id='citySearch' type='text' "
+        "placeholder='Start typing a city...' "
+        "autocomplete='off'>";
+
+  html += "<select id='cityResults' "
+        "size='6' "
+        "style='width:100%;display:none'></select>";
   html += "<label>Display city/name</label>";
-  html += "<input name='city' maxlength='40' value='" + htmlEscape(settings.city) + "'>";
+  
+html += "<input id='city' name='city' value='" +
+        htmlEscape(settings.city) + "'>";
+
 
   html += "<label>Latitude</label>";
-  html += "<input name='lat' inputmode='decimal' value='" + String(settings.latitude, 6) + "'>";
+  
+html += "<input id='lat' name='lat' value='" +
+        String(settings.latitude, 6) + "'>";
+
 
   html += "<label>Longitude</label>";
-  html += "<input name='lon' inputmode='decimal' value='" + String(settings.longitude, 6) + "'>";
+  
+html += "<input id='lon' name='lon' value='" +
+        String(settings.longitude, 6) + "'
+
 
   html += "<label>POSIX timezone string</label>";
-  html += "<input name='tz' value='" + htmlEscape(settings.timezone) + "'>";
+  
+html += "<input id='tz' name='tz' value='" +
+        htmlEscape(settings.timezone) + "'>";
+
   html += "<div class='hint'>NZ mainland example: NZST-12NZDT,M9.5.0,M4.1.0/3</div>";
 
   html += "<label>Clock format</label>";
@@ -158,13 +181,128 @@ void handleRoot() {
   html += "<a class='btn danger' href='/reboot'>Reboot</a>";
   html += "</div>";
 
+	
+html += R"rawliteral(
+
+<script>
+
+let cityMatches = [];
+let searchTimer;
+
+const citySearch =
+  document.getElementById('citySearch');
+
+const cityResults =
+  document.getElementById('cityResults');
+
+citySearch.addEventListener('input', () => {
+
+  clearTimeout(searchTimer);
+
+  const query = citySearch.value.trim();
+
+  if (query.length < 3) {
+    cityResults.style.display = 'none';
+    cityResults.innerHTML = '';
+    return;
+  }
+
+  searchTimer = setTimeout(async () => {
+
+    try {
+
+      const response = await fetch(
+        'https://geocoding-api.open-meteo.com/v1/search?name=' +
+        encodeURIComponent(query) +
+        '&count=10&language=en&format=json'
+      );
+
+      const data = await response.json();
+
+      cityMatches = data.results || [];
+
+      cityResults.innerHTML = '';
+
+      cityMatches.forEach((city, index) => {
+
+        const option =
+          document.createElement('option');
+
+        option.value = index;
+
+        option.text =
+          city.name +
+          ', ' +
+          (city.admin1 || '') +
+          ', ' +
+          city.country;
+
+        cityResults.appendChild(option);
+
+      });
+
+      cityResults.style.display =
+        cityMatches.length ? 'block' : 'none';
+
+    } catch(error) {
+
+      console.error(error);
+
+    }
+
+  }, 300);
+
+});
+
+cityResults.addEventListener('change', () => {
+
+  const city =
+    cityMatches[Number(cityResults.value)];
+
+  if (!city)
+    return;
+
+  document.getElementById('city').value =
+    city.name;
+
+  document.getElementById('lat').value =
+    city.latitude;
+
+  document.getElementById('lon').value =
+    city.longitude;
+
+  document.getElementById('tz').value =
+    city.timezone;
+
+  cityResults.style.display = 'none';
+
+});
+
+</script>
+
+)rawliteral";
+
+	
   html += pageFooter();
   server.send(200, "text/html", html);
 }
 
 void handleSave() {
   if (server.hasArg("city")) settings.city = server.arg("city");
-  if (server.hasArg("tz")) settings.timezone = server.arg("tz");
+  //if (server.hasArg("tz")) settings.timezone = server.arg("tz");
+  if (server.hasArg("tz")) {
+    String tz = server.arg("tz");
+    tz.trim();
+
+    // Convert IANA timezone names returned by geocoding
+    // into POSIX TZ strings used by configTzTime().
+    if (tz.indexOf('/') >= 0) {
+        settings.timezone = String(ianaToPosix(tz.c_str()));
+    } else {
+        settings.timezone = tz;
+    }
+  }
+
   if (server.hasArg("lat")) settings.latitude = server.arg("lat").toFloat();
   if (server.hasArg("lon")) settings.longitude = server.arg("lon").toFloat();
   if (server.hasArg("h24")) settings.use24Hour = server.arg("h24") == "1";
