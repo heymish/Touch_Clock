@@ -10,7 +10,7 @@
 // Project files:
 //   Clock.ino       - main application, Wi-Fi bootstrap, NTP, scheduler
 //   LGFX_Config.h   - LovyanGFX setup for E32R28T-1 ST7789 display
-//   Display.cpp     - all TFT drawing using LovyanGFX
+//   Display.cpp     - all TFT drawing using LovyanGFX, including weather icons
 //   Weather.cpp     - Open-Meteo fetch and weather decoding
 //   WebConfig.cpp   - configuration web interface
 //
@@ -29,6 +29,7 @@ struct AppSettings {
   float longitude;
   bool use24Hour;
   uint8_t brightness;   // 20-255 PWM duty
+  uint8_t rotation;     // 0, 1, 2, or 3
 };
 
 struct WeatherData {
@@ -65,8 +66,15 @@ void drawBootScreen(const String& message);
 void drawClockScreen();
 void drawStatusScreen(const String& line1, const String& line2);
 void applyBrightness();
+void invalidateDisplayCache();
 bool fetchWeather();
 void setupWebServer();
+
+void applyRotation() {
+  settings.rotation = constrain(settings.rotation, 0, 3);
+  tft.setRotation(settings.rotation);
+  invalidateDisplayCache();
+}
 
 void loadSettings() {
   prefs.begin("clock", true);
@@ -78,6 +86,7 @@ void loadSettings() {
   settings.longitude = prefs.getFloat("lon", 172.6362f);
   settings.use24Hour = prefs.getBool("h24", true);
   settings.brightness = prefs.getUChar("bright", 220);
+  settings.rotation = prefs.getUChar("rot", 1); // Landscape default
 
   prefs.end();
 }
@@ -91,6 +100,7 @@ void saveSettings() {
   prefs.putFloat("lon", settings.longitude);
   prefs.putBool("h24", settings.use24Hour);
   prefs.putUChar("bright", settings.brightness);
+  prefs.putUChar("rot", settings.rotation);
 
   prefs.end();
 }
@@ -148,8 +158,8 @@ void setup() {
   digitalWrite(TFT_BL_PIN, HIGH);
 
   tft.init();
-  tft.setRotation(1);  // Landscape. Try 0, 2, or 3 if needed.
   tft.setColorDepth(16);
+  applyRotation();
   tft.fillScreen(TFT_BLACK);
 
   applyBrightness();
