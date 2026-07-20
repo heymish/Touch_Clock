@@ -66,6 +66,14 @@ static String pageFooter() {
   return "</body></html>";
 }
 
+inline const char* ianaToPosix(const char* iana) {
+    for (size_t i = 0; i < TZ_MAPPINGS_COUNT; i++) {
+        if (strcmp(iana, tz_mappings[i].iana) == 0)
+            return tz_mappings[i].posix;
+    }
+    return "UTC0"; // fallback
+}
+
 static String selected(uint8_t value, uint8_t current) {
   return value == current ? " selected" : "";
 }
