@@ -12,6 +12,7 @@ struct AppSettings {
   float longitude;
   bool use24Hour;
   uint8_t brightness;
+  uint8_t rotation;
 };
 
 struct WeatherData {
@@ -33,7 +34,16 @@ static String lastDrawnTime = "";
 static String lastDrawnDate = "";
 static String lastDrawnWeather = "";
 static String lastDrawnIp = "";
+static int lastDrawnWeatherCode = -999;
 static bool brightnessReady = false;
+
+void invalidateDisplayCache() {
+  lastDrawnTime = "";
+  lastDrawnDate = "";
+  lastDrawnWeather = "";
+  lastDrawnIp = "";
+  lastDrawnWeatherCode = -999;
+}
 
 void applyBrightness() {
   uint8_t duty = constrain(settings.brightness, 20, 255);
@@ -55,6 +65,89 @@ void applyBrightness() {
   }
   ledcWrite(backlightChannel, duty);
 #endif
+}
+
+static void drawSun(int x, int y, int r) {
+  tft.fillCircle(x, y, r, TFT_YELLOW);
+  for (int i = 0; i < 8; i++) {
+    float a = i * PI / 4.0f;
+    int x1 = x + cos(a) * (r + 4);
+    int y1 = y + sin(a) * (r + 4);
+    int x2 = x + cos(a) * (r + 11);
+    int y2 = y + sin(a) * (r + 11);
+    tft.drawLine(x1, y1, x2, y2, TFT_YELLOW);
+  }
+}
+
+static void drawCloud(int x, int y, uint16_t color) {
+  tft.fillCircle(x - 14, y + 4, 12, color);
+  tft.fillCircle(x, y - 4, 16, color);
+  tft.fillCircle(x + 18, y + 5, 13, color);
+  tft.fillRoundRect(x - 28, y + 5, 58, 18, 8, color);
+}
+
+static void drawRainDrops(int x, int y, uint16_t color) {
+  for (int i = 0; i < 4; i++) {
+    int dx = x - 20 + i * 14;
+    tft.drawLine(dx, y, dx - 4, y + 12, color);
+    tft.drawLine(dx + 1, y, dx - 3, y + 12, color);
+  }
+}
+
+static void drawSnowFlakes(int x, int y, uint16_t color) {
+  for (int i = 0; i < 3; i++) {
+    int cx = x - 16 + i * 16;
+    int cy = y + (i % 2) * 6;
+    tft.drawLine(cx - 5, cy, cx + 5, cy, color);
+    tft.drawLine(cx, cy - 5, cx, cy + 5, color);
+    tft.drawLine(cx - 4, cy - 4, cx + 4, cy + 4, color);
+    tft.drawLine(cx - 4, cy + 4, cx + 4, cy - 4, color);
+  }
+}
+
+static void drawLightning(int x, int y) {
+  tft.fillTriangle(x, y, x - 7, y + 20, x + 2, y + 20, TFT_YELLOW);
+  tft.fillTriangle(x + 2, y + 16, x - 4, y + 38, x + 12, y + 12, TFT_YELLOW);
+}
+
+static void drawFog(int x, int y) {
+  for (int i = 0; i < 4; i++) {
+    int yy = y + i * 9;
+    tft.drawLine(x - 30, yy, x + 30, yy, TFT_LIGHTGREY);
+    tft.drawLine(x - 24, yy + 3, x + 24, yy + 3, TFT_DARKGREY);
+  }
+}
+
+static void drawWeatherIcon(int code, int x, int y) {
+  // Clear icon background area.
+  tft.fillRoundRect(x - 42, y - 34, 84, 72, 10, TFT_BLACK);
+
+  if (code == 0) {
+    drawSun(x, y, 17);
+  } else if (code == 1 || code == 2) {
+    drawSun(x - 15, y - 10, 12);
+    drawCloud(x + 8, y + 5, TFT_LIGHTGREY);
+  } else if (code == 3) {
+    drawCloud(x, y, TFT_LIGHTGREY);
+    drawCloud(x + 8, y + 12, TFT_DARKGREY);
+  } else if (code == 45 || code == 48) {
+    drawFog(x, y - 12);
+  } else if ((code >= 51 && code <= 57) || (code >= 61 && code <= 67) || (code >= 80 && code <= 82)) {
+    drawCloud(x, y - 8, TFT_LIGHTGREY);
+    drawRainDrops(x, y + 20, TFT_CYAN);
+  } else if ((code >= 71 && code <= 77) || code == 85 || code == 86) {
+    drawCloud(x, y - 8, TFT_LIGHTGREY);
+    drawSnowFlakes(x, y + 22, TFT_WHITE);
+  } else if (code == 95 || code == 96 || code == 99) {
+    drawCloud(x, y - 10, TFT_DARKGREY);
+    drawLightning(x + 2, y + 8);
+    drawRainDrops(x - 6, y + 22, TFT_CYAN);
+  } else {
+    tft.drawCircle(x, y, 24, TFT_ORANGE);
+    tft.setTextDatum(middle_center);
+    tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+    tft.drawString("?", x, y, &fonts::Font4);
+  }
 }
 
 void drawBootScreen(const String& message) {
@@ -114,7 +207,8 @@ void drawClockScreen() {
   }
 
   bool fullRedraw = false;
-  if (lastDrawnDate != dateLine || lastDrawnWeather != weatherLine || lastDrawnIp != ipLine) {
+  if (lastDrawnDate != dateLine || lastDrawnWeather != weatherLine ||
+      lastDrawnIp != ipLine || lastDrawnWeatherCode != weather.weatherCode) {
     fullRedraw = true;
   }
 
@@ -129,20 +223,24 @@ void drawClockScreen() {
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawString(dateLine, 160, 104, &fonts::Font2);
 
+    // Weather icon on the left, text on the right.
+    int iconCode = weather.valid ? weather.weatherCode : -1;
+    drawWeatherIcon(iconCode, 48, 171);
+
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawString(settings.city, 160, 146, &fonts::Font4);
+    tft.drawString(settings.city, 190, 146, &fonts::Font4);
 
     tft.setTextColor(weather.valid ? TFT_GREEN : TFT_ORANGE, TFT_BLACK);
-    tft.drawString(weatherLine, 160, 180, &fonts::Font2);
+    tft.drawString(weatherLine, 190, 180, &fonts::Font2);
 
     if (weather.valid) {
       String rainLine = "Today rain: " + String(weather.rainSum, 1) + " mm  Updated: " + weather.updatedAt;
       tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-      tft.drawString(rainLine, 160, 200, &fonts::Font2);
+      tft.drawString(rainLine, 190, 200, &fonts::Font2);
     }
 
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString(ipLine, 160, 228, &fonts::Font2);
+    tft.drawString(ipLine + "  Rot " + String(settings.rotation), 160, 228, &fonts::Font2);
   }
 
   if (lastDrawnTime != timeLine || fullRedraw) {
@@ -158,4 +256,5 @@ void drawClockScreen() {
   lastDrawnDate = dateLine;
   lastDrawnWeather = weatherLine;
   lastDrawnIp = ipLine;
+  lastDrawnWeatherCode = weather.weatherCode;
 }
