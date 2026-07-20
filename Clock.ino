@@ -10,17 +10,17 @@
 // Project files:
 //   Clock.ino       - main application, Wi-Fi bootstrap, NTP, scheduler
 //   LGFX_Config.h   - LovyanGFX setup for E32R28T-1 ST7789 display
-//   Display.cpp     - all TFT drawing using LovyanGFX, including weather icons
+//   Display.cpp     - all TFT drawing, weather icons, dimming brightness logic
 //   Weather.cpp     - Open-Meteo fetch and weather decoding
 //   WebConfig.cpp   - configuration web interface
-//
-// Arduino IDE libraries required:
-//   LovyanGFX
-//   WiFiManager
-//   ArduinoJson
-//
-// Recommended Arduino board:
-//   ESP32 Dev Module
+  
+								  
+			  
+				
+				
+  
+							 
+					 
 
 struct AppSettings {
   String city;
@@ -28,8 +28,12 @@ struct AppSettings {
   float latitude;
   float longitude;
   bool use24Hour;
-  uint8_t brightness;   // 20-255 PWM duty
-  uint8_t rotation;     // 0, 1, 2, or 3
+  uint8_t brightness;       // Daytime/manual brightness, 20-255
+  uint8_t rotation;         // 0, 1, 2, or 3
+  bool autoDim;             // Dim display automatically at night
+  uint8_t nightBrightness;  // Night brightness, 1-255
+  uint8_t dimStartHour;     // 0-23, local time
+  uint8_t dimEndHour;       // 0-23, local time
 };
 
 struct WeatherData {
@@ -56,10 +60,12 @@ const char* NTP_SERVER_2 = "time.google.com";
 const unsigned long SCREEN_INTERVAL_MS = 1000UL;
 const unsigned long WEATHER_INTERVAL_MS = 60UL * 60UL * 1000UL;
 const unsigned long NTP_RETRY_INTERVAL_MS = 10UL * 60UL * 1000UL;
+const unsigned long BRIGHTNESS_CHECK_INTERVAL_MS = 60UL * 1000UL;
 
 unsigned long lastScreenUpdate = 0;
 unsigned long lastWeatherUpdate = 0;
 unsigned long lastNtpRetry = 0;
+unsigned long lastBrightnessCheck = 0;
 
 // Functions implemented in other project files
 void drawBootScreen(const String& message);
@@ -79,14 +85,20 @@ void applyRotation() {
 void loadSettings() {
   prefs.begin("clock", true);
 
-  // Defaults: Christchurch, New Zealand mainland timezone with automatic DST.
-  settings.city = prefs.getString("city", "Christchurch");
+  // Defaults: Hokitika/NZ-compatible timezone, with automatic daylight saving.
+  settings.city = prefs.getString("city", "Hokitika");
   settings.timezone = prefs.getString("tz", "NZST-12NZDT,M9.5.0,M4.1.0/3");
-  settings.latitude = prefs.getFloat("lat", -43.5321f);
-  settings.longitude = prefs.getFloat("lon", 172.6362f);
+  settings.latitude = prefs.getFloat("lat", -42.7167f);
+  settings.longitude = prefs.getFloat("lon", 170.9667f);
   settings.use24Hour = prefs.getBool("h24", true);
   settings.brightness = prefs.getUChar("bright", 220);
-  settings.rotation = prefs.getUChar("rot", 1); // Landscape default
+  settings.rotation = prefs.getUChar("rot", 1);
+
+  // Night dimming defaults: dim from 22:00 to 07:00.
+  settings.autoDim = prefs.getBool("autodim", true);
+  settings.nightBrightness = prefs.getUChar("nbright", 35);
+  settings.dimStartHour = prefs.getUChar("dimstart", 22);
+  settings.dimEndHour = prefs.getUChar("dimend", 7);
 
   prefs.end();
 }
@@ -101,6 +113,10 @@ void saveSettings() {
   prefs.putBool("h24", settings.use24Hour);
   prefs.putUChar("bright", settings.brightness);
   prefs.putUChar("rot", settings.rotation);
+  prefs.putBool("autodim", settings.autoDim);
+  prefs.putUChar("nbright", settings.nightBrightness);
+  prefs.putUChar("dimstart", settings.dimStartHour);
+  prefs.putUChar("dimend", settings.dimEndHour);
 
   prefs.end();
 }
@@ -120,6 +136,7 @@ void setupTime() {
   for (int i = 0; i < 30; i++) {
     if (hasValidTime()) {
       Serial.println("NTP time synced.");
+      applyBrightness();
       return;
     }
     delay(500);
@@ -192,6 +209,11 @@ void loop() {
   if (!hasValidTime() && now - lastNtpRetry >= NTP_RETRY_INTERVAL_MS) {
     lastNtpRetry = now;
     setupTime();
+  }
+
+  if (now - lastBrightnessCheck >= BRIGHTNESS_CHECK_INTERVAL_MS) {
+    lastBrightnessCheck = now;
+    applyBrightness();
   }
 
   if (now - lastWeatherUpdate >= WEATHER_INTERVAL_MS) {
