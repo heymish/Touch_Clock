@@ -203,9 +203,11 @@ void drawClockScreen() {
   String ipLine = WiFi.isConnected() ? WiFi.localIP().toString() : "WiFi offline";
 
   String weatherLine;
+  String conditions;
+  String temps;
   if (weather.valid) {
-    weatherLine = weather.summary + "  " +
-                  String(weather.tempMin, 1) + "-" + String(weather.tempMax, 1) + "C  " +
+    conditions = weather.summary; 
+    temps =  String(weather.tempMin, 1) + "-" + String(weather.tempMax, 1) + "C  " +
                   "Rain " + String(weather.precipProb) + "%";
   } else {
     weatherLine = "Weather loading...";
@@ -220,41 +222,42 @@ void drawClockScreen() {
   if (fullRedraw) {
     tft.fillScreen(TFT_BLACK);
 
-    tft.drawRoundRect(6, 6, 308, 116, 10, TFT_DARKGREY);
-    tft.drawRoundRect(6, 130, 308, 82, 10, TFT_DARKGREY);
+    tft.drawRoundRect(6, 6, 308, 92, 10, TFT_DARKGREY);
+    tft.drawRoundRect(6, 104, 308, 116, 10, TFT_DARKGREY);
 
     tft.setTextDatum(middle_center);
 
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString(dateLine, 160, 104, &fonts::Font2);
+    tft.drawString(dateLine, 160, 82, &fonts::Font2);
 
     // Weather icon on the left, text on the right.
     int iconCode = weather.valid ? weather.weatherCode : -1;
-    drawWeatherIcon(iconCode, 38, 171);
+    drawWeatherIcon(iconCode, 50, 155);
 
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawString(settings.city, 175, 146, &fonts::Font4);
+    tft.drawString(settings.city, 190, 130, &fonts::Font4);
 
     tft.setTextColor(weather.valid ? TFT_GREEN : TFT_ORANGE, TFT_BLACK);
-    tft.drawString(weatherLine, 175, 180, &fonts::Font2);
+    tft.drawString(conditions, 205, 160, &fonts::Font2);
+    tft.drawString(temps, 205, 182, &fonts::Font2);
 
     if (weather.valid) {
-      String rainLine = "Today rain: " + String(weather.rainSum, 1) + " mm  Updated: " + weather.updatedAt;
+      String rainLine = "Today rain: " + String(weather.rainSum, 1) + " mm";
       tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-      tft.drawString(rainLine, 175, 200, &fonts::Font2);
+      tft.drawString(rainLine, 205, 200, &fonts::Font2);
     }
 
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString(ipLine + "  Rot " + String(settings.rotation), 160, 228, &fonts::Font2);
+    tft.drawString(ipLine + "  Updated: " + weather.updatedAt, 160, 228, &fonts::Font2);
   }
 
   if (lastDrawnTime != timeLine || fullRedraw) {
-    tft.fillRect(15, 30, 290, 58, TFT_BLACK);
+    tft.fillRect(15, 22, 290, 48, TFT_BLACK);
     tft.setTextDatum(middle_center);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
 
     // Font7 gives large clock digits similar to the TFT_eSPI version.
-    tft.drawString(timeLine, 160, 62, &fonts::Font7);
+    tft.drawString(timeLine, 160, 48, &fonts::Font7);
   }
 
   lastDrawnTime = timeLine;
