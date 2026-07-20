@@ -3,22 +3,24 @@
 #include <WiFiManager.h>
 #include <WebServer.h>
 #include <Preferences.h>
-#include <TFT_eSPI.h>
 #include <time.h>
 
+#include "LGFX_Config.h"
+
 // Project files:
-//   Clock.ino      - main application, Wi-Fi bootstrap, NTP, scheduler
-//   Display.cpp    - all TFT drawing
-//   Weather.cpp    - Open-Meteo fetch and weather decoding
-//   WebConfig.cpp  - configuration web interface
+//   Clock.ino       - main application, Wi-Fi bootstrap, NTP, scheduler
+//   LGFX_Config.h   - LovyanGFX setup for E32R28T-1 ST7789 display
+//   Display.cpp     - all TFT drawing using LovyanGFX
+//   Weather.cpp     - Open-Meteo fetch and weather decoding
+//   WebConfig.cpp   - configuration web interface
 //
-// Arduino IDE setup:
-//   Board: ESP32 Dev Module or the matching ESP32 board profile
-//   Libraries: TFT_eSPI, WiFiManager, ArduinoJson
+// Arduino IDE libraries required:
+//   LovyanGFX
+//   WiFiManager
+//   ArduinoJson
 //
-// TFT_eSPI User_Setup.h for E32R28T-1 ST7789 should use your board's ST7789 settings.
-// Common LCDWiki pins for this ESP32 display family:
-//   TFT_MOSI 13, TFT_SCLK 14, TFT_CS 15, TFT_DC 2, TFT_RST -1, TFT_BL 21
+// Recommended Arduino board:
+//   ESP32 Dev Module
 
 struct AppSettings {
   String city;
@@ -26,7 +28,7 @@ struct AppSettings {
   float latitude;
   float longitude;
   bool use24Hour;
-  uint8_t brightness;   // 0-255 PWM duty
+  uint8_t brightness;   // 20-255 PWM duty
 };
 
 struct WeatherData {
@@ -40,7 +42,7 @@ struct WeatherData {
   String updatedAt;
 };
 
-TFT_eSPI tft = TFT_eSPI();
+LGFX tft;
 WebServer server(80);
 Preferences prefs;
 
@@ -142,12 +144,15 @@ void setup() {
 
   loadSettings();
 
-  pinMode(21, OUTPUT); // LCD backlight on this board family
-  applyBrightness();
+  pinMode(TFT_BL_PIN, OUTPUT);
+  digitalWrite(TFT_BL_PIN, HIGH);
 
   tft.init();
-  tft.setRotation(1);  // Landscape: 320 x 240 on most ST7789 setups
+  tft.setRotation(1);  // Landscape. Try 0, 2, or 3 if needed.
+  tft.setColorDepth(16);
   tft.fillScreen(TFT_BLACK);
+
+  applyBrightness();
 
   drawBootScreen("Starting clock...");
 
