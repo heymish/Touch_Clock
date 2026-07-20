@@ -144,6 +144,7 @@ void handleRoot() {
   html += "<p><b>Weather:</b> " + htmlEscape(weather.summary) + "</p>";
   html += "<p><b>Rotation:</b> " + String(settings.rotation) + "</p>";
   html += "<p><b>Night dimming:</b> " + String(settings.autoDim ? "Enabled" : "Disabled") + " from " + String(settings.dimStartHour) + ":00 to " + String(settings.dimEndHour) + ":00</p>";
+  html += "OTA Hostname: ESP32-Clock<br>";
   html += "<a class='btn' href='/weather'>Refresh weather</a>";
   html += "<a class='btn danger' href='/resetwifi'>Reset Wi-Fi</a>";
   html += "<a class='btn danger' href='/reboot'>Reboot</a>";
