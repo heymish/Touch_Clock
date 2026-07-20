@@ -10,8 +10,12 @@ struct AppSettings {
   float latitude;
   float longitude;
   bool use24Hour;
-  uint8_t brightness;
-  uint8_t rotation;
+  uint8_t brightness;       // Daytime/manual brightness, 20-255
+  uint8_t rotation;         // 0, 1, 2, or 3
+  bool autoDim;             // Dim display automatically at night
+  uint8_t nightBrightness;  // Night brightness, 1-255
+  uint8_t dimStartHour;     // 0-23, local time
+  uint8_t dimEndHour;       // 0-23, local time
 };
 
 struct WeatherData {
@@ -66,6 +70,20 @@ static String selected(uint8_t value, uint8_t current) {
   return value == current ? " selected" : "";
 }
 
+static String selectedBool(bool value, bool current) {
+  return value == current ? " selected" : "";
+}
+
+static String hourOptions(uint8_t current) {
+  String html;
+  for (uint8_t h = 0; h < 24; h++) {
+    char label[8];
+    snprintf(label, sizeof(label), "%02u:00", h);
+    html += "<option value='" + String(h) + "'" + selected(h, current) + ">" + String(label) + "</option>";
+  }
+  return html;
+}
+
 void handleRoot() {
   String html = pageHeader("ESP32 Clock Setup");
 
@@ -96,10 +114,27 @@ void handleRoot() {
   html += "<option value='2'" + selected(2, settings.rotation) + ">2 - Portrait inverted</option>";
   html += "<option value='3'" + selected(3, settings.rotation) + ">3 - Landscape inverted</option>";
   html += "</select>";
-  html += "<div class='hint'>If the display is upside down or sideways, choose another rotation and save.</div>";
+																												 
 
-  html += "<label>Brightness: " + String(settings.brightness) + "</label>";
+  html += "<label>Day brightness: " + String(settings.brightness) + "</label>";
   html += "<input type='range' min='20' max='255' name='brightness' value='" + String(settings.brightness) + "'>";
+
+  html += "<hr><h2>Night dimming</h2>";
+  html += "<label>Automatic night dimming</label>";
+  html += "<select name='autodim'>";
+  html += "<option value='1'" + selectedBool(true, settings.autoDim) + ">Enabled</option>";
+  html += "<option value='0'" + selectedBool(false, settings.autoDim) + ">Disabled</option>";
+  html += "</select>";
+
+  html += "<label>Night brightness: " + String(settings.nightBrightness) + "</label>";
+  html += "<input type='range' min='1' max='180' name='nightbrightness' value='" + String(settings.nightBrightness) + "'>";
+
+  html += "<label>Dim start time</label>";
+  html += "<select name='dimstart'>" + hourOptions(settings.dimStartHour) + "</select>";
+
+  html += "<label>Brighten again at</label>";
+  html += "<select name='dimend'>" + hourOptions(settings.dimEndHour) + "</select>";
+  html += "<div class='hint'>Example: start 22:00 and end 07:00 dims overnight. Times use the clock timezone after NTP sync.</div>";
 
   html += "<button type='submit'>Save settings</button>";
   html += "</form></div>";
@@ -108,6 +143,7 @@ void handleRoot() {
   html += "<p><b>Device IP:</b> " + WiFi.localIP().toString() + "</p>";
   html += "<p><b>Weather:</b> " + htmlEscape(weather.summary) + "</p>";
   html += "<p><b>Rotation:</b> " + String(settings.rotation) + "</p>";
+  html += "<p><b>Night dimming:</b> " + String(settings.autoDim ? "Enabled" : "Disabled") + " from " + String(settings.dimStartHour) + ":00 to " + String(settings.dimEndHour) + ":00</p>";
   html += "<a class='btn' href='/weather'>Refresh weather</a>";
   html += "<a class='btn danger' href='/resetwifi'>Reset Wi-Fi</a>";
   html += "<a class='btn danger' href='/reboot'>Reboot</a>";
@@ -125,6 +161,10 @@ void handleSave() {
   if (server.hasArg("h24")) settings.use24Hour = server.arg("h24") == "1";
   if (server.hasArg("brightness")) settings.brightness = constrain(server.arg("brightness").toInt(), 20, 255);
   if (server.hasArg("rotation")) settings.rotation = constrain(server.arg("rotation").toInt(), 0, 3);
+  if (server.hasArg("autodim")) settings.autoDim = server.arg("autodim") == "1";
+  if (server.hasArg("nightbrightness")) settings.nightBrightness = constrain(server.arg("nightbrightness").toInt(), 1, 255);
+  if (server.hasArg("dimstart")) settings.dimStartHour = constrain(server.arg("dimstart").toInt(), 0, 23);
+  if (server.hasArg("dimend")) settings.dimEndHour = constrain(server.arg("dimend").toInt(), 0, 23);
 
   saveSettings();
   applyBrightness();
