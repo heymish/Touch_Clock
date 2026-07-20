@@ -25,3 +25,6 @@ Need to following libraries
 TFT_eSPI  
 WiFiManager  
 ArduinoJson  
+
+Case  
+https://www.printables.com/model/645166-esp32-28inch-touch-ips-cyd-lcd-screen-case
