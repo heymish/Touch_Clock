@@ -10,7 +10,12 @@ struct AppSettings {
   float latitude;
   float longitude;
   bool use24Hour;
-  uint8_t brightness;
+  uint8_t brightness;       // Daytime/manual brightness, 20-255
+  uint8_t rotation;         // 0, 1, 2, or 3
+  bool autoDim;             // Dim display automatically at night
+  uint8_t nightBrightness;  // Night brightness, 1-255
+  uint8_t dimStartHour;     // 0-23, local time
+  uint8_t dimEndHour;       // 0-23, local time
 };
 
 struct WeatherData {
