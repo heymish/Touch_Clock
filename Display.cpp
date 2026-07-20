@@ -13,8 +13,12 @@ struct AppSettings {
   float latitude;
   float longitude;
   bool use24Hour;
-  uint8_t brightness;
-  uint8_t rotation;
+  uint8_t brightness;       // Daytime/manual brightness, 20-255
+  uint8_t rotation;         // 0, 1, 2, or 3
+  bool autoDim;             // Dim display automatically at night
+  uint8_t nightBrightness;  // Night brightness, 1-255
+  uint8_t dimStartHour;     // 0-23, local time
+  uint8_t dimEndHour;       // 0-23, local time
 };
 
 struct WeatherData {
@@ -47,8 +51,33 @@ void invalidateDisplayCache() {
   lastDrawnWeatherCode = -999;
 }
 
+static bool isInDimPeriod(uint8_t hourNow) {
+  uint8_t startHour = constrain(settings.dimStartHour, 0, 23);
+  uint8_t endHour = constrain(settings.dimEndHour, 0, 23);
+
+  if (startHour == endHour) {
+    return false;
+  }
+
+  if (startHour < endHour) {
+    return hourNow >= startHour && hourNow < endHour;
+  }
+
+  return hourNow >= startHour || hourNow < endHour;
+}
+
+
 void applyBrightness() {
   uint8_t duty = constrain(settings.brightness, 20, 255);
+
+    if (settings.autoDim) {
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 50)) {
+      if (isInDimPeriod(timeinfo.tm_hour)) {
+        duty = constrain(settings.nightBrightness, 1, 255);
+      }
+    }
+  }
 
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
   // ESP32 Arduino Core 3.x LEDC API
