@@ -1,5 +1,6 @@
-TFT_eSPI/User_setup.h
-
+//Edit TFT_eSPI/User_setup_select.h
+//add
+//#include <User_setups/Setup_E32R28T_1.h>
 
 #define ST7789_DRIVER
 
@@ -20,8 +21,3 @@ TFT_eSPI/User_setup.h
 #define LOAD_FONT7
 
 #define SPI_FREQUENCY 27000000
-
-
-//Might need thise to set the rotation
-//tft.setRotation(1);
-//Try 0, 1, 2, or 3.
