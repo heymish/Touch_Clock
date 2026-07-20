@@ -54,8 +54,8 @@ static String weatherCodeToText(int code) {
     case 73:
     case 75: return "Snow";
     case 77: return "Snow grains";
-    case 80:
-    case 81:
+    case 80: return "Slight Rain";
+    case 81: return "Moderate Rain";
     case 82: return "Rain showers";
     case 85:
     case 86: return "Snow showers";
