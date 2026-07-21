@@ -5,9 +5,8 @@
 #include <LovyanGFX.hpp>
 
 // LovyanGFX configuration for LCDWiki E32R28T-1 / ESP32E 240x320 board
-// Official pin assignments from: https://www.lcdwiki.com/2.8inch_ESP32-32E_Display
-// Display: ST7789 on SPI1 (HSPI)
-// Touch: XPT2046 on SPI2 (VSPI)
+// Display: ST7789 on VSPI (verified working)
+// Touch: XPT2046 will use independent SPI on GPIO25/32/39/33
 
 #define TFT_BL_PIN 21
 
@@ -21,8 +20,8 @@ public:
     {
       auto cfg = _bus.config();
 
-      // Display uses SPI1 (HSPI) - NOT VSPI
-      cfg.spi_host = SPI1_HOST;  // Changed from VSPI_HOST to SPI1_HOST
+      // Display MUST use VSPI_HOST - this is what works on this board
+      cfg.spi_host = VSPI_HOST;
       cfg.spi_mode = 0;
       cfg.freq_write = 40000000;
       cfg.freq_read  = 16000000;
@@ -31,11 +30,10 @@ public:
       cfg.use_lock = true;
       cfg.dma_channel = SPI_DMA_CH_AUTO;
 
-      // Official pins for LCD (LCDWIKI spec)
-      cfg.pin_sclk = 14;   // Official: IO14
-      cfg.pin_mosi = 13;   // Official: IO13
-      cfg.pin_miso = 12;   // Official: IO12
-      cfg.pin_dc   = 2;    // Official: IO2 (this is correct per datasheet)
+      cfg.pin_sclk = 14;
+      cfg.pin_mosi = 13;
+      cfg.pin_miso = 12;
+      cfg.pin_dc   = 2;
 
       _bus.config(cfg);
       _panel.setBus(&_bus);
@@ -44,8 +42,8 @@ public:
     {
       auto cfg = _panel.config();
 
-      cfg.pin_cs  = 15;    // Official: IO15
-      cfg.pin_rst = -1;    // Official: shared with EN/reset
+      cfg.pin_cs  = 15;
+      cfg.pin_rst = -1;
       cfg.pin_busy = -1;
 
       cfg.panel_width  = 240;
@@ -76,17 +74,15 @@ public:
       cfg.y_min = 0;
       cfg.y_max = 320;
       
-      // Touch uses SPI2 (VSPI) - separate from display
-      cfg.spi_host = SPI2_HOST;  // Touch on VSPI
+      // Touch uses independent pins per LCDWIKI spec
+      cfg.spi_host = FSPI_HOST;  // Use FSPI (SPI0) for touch - separate from display VSPI
+      cfg.pin_cs = 33;     // GPIO33 - XPT2046 CS
+      cfg.pin_int = 36;    // GPIO36 - XPT2046 interrupt
+      cfg.pin_sclk = 25;   // GPIO25 - Touch SCLK
+      cfg.pin_mosi = 32;   // GPIO32 - Touch MOSI
+      cfg.pin_miso = 39;   // GPIO39 - Touch MISO
       
-      // Official pins for resistive touch (LCDWIKI spec)
-      cfg.pin_cs = 33;     // Official: IO33
-      cfg.pin_int = 36;    // Official: IO36 (touch interrupt)
-      cfg.pin_sclk = 25;   // Official: IO25
-      cfg.pin_mosi = 32;   // Official: IO32
-      cfg.pin_miso = 39;   // Official: IO39
-      
-      cfg.bus_shared = false;  // Separate SPI bus, so not shared
+      cfg.bus_shared = false;  // Separate SPI bus entirely
       cfg.freq = 2500000;
 
       _touch.config(cfg);
