@@ -76,6 +76,10 @@ public:
       cfg.y_max = 320;
       cfg.pin_cs = 4;
       cfg.pin_int = -1;
+      cfg.pin_miso = 12;
+      cfg.pin_mosi = 13;
+      cfg.pin_sclk = 14;
+      cfg.spi_host = VSPI_HOST;        // Use same SPI host as display
       cfg.bus_shared = true;
       cfg.freq = 2500000;
 
