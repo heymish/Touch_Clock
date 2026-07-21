@@ -27,6 +27,7 @@ struct WeatherData {
   float rainSum;
   int precipProb;
   String updatedAt;
+  float tempCurrent;
 };
 
 extern AppSettings settings;
@@ -88,6 +89,7 @@ bool fetchWeather() {
   url += "&longitude=" + String(settings.longitude, 6);
   url += "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max";
   url += "&forecast_days=1";
+  url += "&current=apparent_temperature";
   url += "&timezone=auto";
 
   Serial.print("Weather URL: ");
@@ -109,7 +111,7 @@ bool fetchWeather() {
   String payload = http.getString();
   http.end();
 
-  StaticJsonDocument<4096> doc;
+  StaticJsonDocument<2048> doc;
   DeserializationError err = deserializeJson(doc, payload);
   if (err) {
     Serial.print("Weather JSON error: ");
@@ -127,7 +129,7 @@ bool fetchWeather() {
   weather.summary = weatherCodeToText(weather.weatherCode);
   weather.updatedAt = currentLocalTimeShort();
   weather.valid = true;
-
+  weather.tempCurrent = doc["current"]["apparent_temperature"] | 0.0;
   Serial.println("Weather updated OK.");
   return true;
 }
