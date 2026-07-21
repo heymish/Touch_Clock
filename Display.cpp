@@ -30,11 +30,13 @@ struct WeatherData {
   float rainSum;
   int precipProb;
   String updatedAt;
+  float tempCurrent;
 };
 
 extern LGFX tft;
 extern AppSettings settings;
 extern WeatherData weather;
+extern bool showWeather;
 
 static String lastDrawnTime = "";
 static String lastDrawnDate = "";
@@ -235,7 +237,7 @@ void drawClockScreen() {
   String conditions;
   String temps;
   if (weather.valid) {
-    conditions = weather.summary; 
+    conditions = weather.summary + "-" + String(weather.tempCurrent, 1) + "C "; 
     temps =  String(weather.tempMin, 1) + "-" + String(weather.tempMax, 1) + "C  " +
                   "Rain " + String(weather.precipProb) + "%";
   } else {
@@ -250,43 +252,63 @@ void drawClockScreen() {
 
   if (fullRedraw) {
     tft.fillScreen(TFT_BLACK);
+    if (showWeather){
+      tft.drawRoundRect(6, 6, 308, 92, 10, TFT_DARKGREY);
+      tft.drawRoundRect(6, 104, 308, 116, 10, TFT_DARKGREY);
 
-    tft.drawRoundRect(6, 6, 308, 92, 10, TFT_DARKGREY);
-    tft.drawRoundRect(6, 104, 308, 116, 10, TFT_DARKGREY);
+      tft.setTextDatum(middle_center);
 
-    tft.setTextDatum(middle_center);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawString(dateLine, 160, 82, &fonts::Font2);
 
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString(dateLine, 160, 82, &fonts::Font2);
+      // Weather icon on the left, text on the right.
+      int iconCode = weather.valid ? weather.weatherCode : -1;
+      drawWeatherIcon(iconCode, 50, 155);
 
-    // Weather icon on the left, text on the right.
-    int iconCode = weather.valid ? weather.weatherCode : -1;
-    drawWeatherIcon(iconCode, 50, 155);
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      tft.drawString(settings.city, 190, 130, &fonts::Font4);
 
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.drawString(settings.city, 190, 130, &fonts::Font4);
+      tft.setTextColor(weather.valid ? TFT_GREEN : TFT_ORANGE, TFT_BLACK);
+      tft.drawString(conditions, 205, 160, &fonts::Font2);
+      tft.drawString(temps, 205, 182, &fonts::Font2);
 
-    tft.setTextColor(weather.valid ? TFT_GREEN : TFT_ORANGE, TFT_BLACK);
-    tft.drawString(conditions, 205, 160, &fonts::Font2);
-    tft.drawString(temps, 205, 182, &fonts::Font2);
+      if (weather.valid) {
+        String rainLine = "Today rain: " + String(weather.rainSum, 1) + " mm";
+        tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        tft.drawString(rainLine, 205, 200, &fonts::Font2);
+      }
 
-    if (weather.valid) {
-      String rainLine = "Today rain: " + String(weather.rainSum, 1) + " mm";
-      tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-      tft.drawString(rainLine, 205, 200, &fonts::Font2);
+      tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+      tft.drawString(ipLine + "  Updated: " + weather.updatedAt, 160, 228, &fonts::Font2);
+    } else {
+      //Time only
+      tft.setTextDatum(middle_center);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawString(dateLine, 160, 80, &fonts::Font2);
+
+      tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+      tft.drawString(ipLine, 160, 250, &fonts::Font2);
+
+      tft.setTextColor(TFT_CYAN, TFT_BLACK);
+      tft.drawString("(Tap to show weather)", 160, 290, &fonts::Font2);
     }
-
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString(ipLine + "  Updated: " + weather.updatedAt, 160, 228, &fonts::Font2);
   }
 
   if (lastDrawnTime != timeLine || fullRedraw) {
+    if (showWeather){
     tft.fillRect(15, 22, 290, 48, TFT_BLACK);
+    } else {
+      tft.fillRect(15, 110, 290, 90, TFT_BLACK);
+    }
     tft.setTextDatum(middle_center);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
 
     // Font7 gives large clock digits similar to the TFT_eSPI version.
+    if (showWeather) {
     tft.drawString(timeLine, 160, 48, &fonts::Font7);
+    } else {
+      tft.drawString(timeLine, 160, 155, &fonts::Font7);
+    }
   }
 
   lastDrawnTime = timeLine;
