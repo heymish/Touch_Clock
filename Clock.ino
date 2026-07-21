@@ -137,16 +137,16 @@ void setupOTA() {
     ArduinoOTA.setPassword(OTA_PASSWORD);
   }
 
-  ArduinoOTA.onStart( {
+  ArduinoOTA.onStart([](){
     drawStatusScreen("OTA Update", "Starting...");
     Serial.println("OTA started");
   });
 
-  ArduinoOTA.onEnd( {
+  ArduinoOTA.onEnd([](){
     Serial.println("\nOTA complete");
   });
 
-  ArduinoOTA.onProgress([](unsigned int progressnsigned int total {
+  ArduinoOTA.onProgress([](unsigned int progress,unsigned int total) {
     static unsigned long lastUpdate = 0;
 
     if (millis() - lastUpdate > 500) {
@@ -167,7 +167,7 @@ void setupOTA() {
     Serial.printf("OTA Progress: %u%%\r", percent);
   });
 
-  ArduinoOTA.onError(ota_error_t error {
+  ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("OTA Error[%u]\n", error);
 
     String message = "Error";
