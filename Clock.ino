@@ -297,6 +297,9 @@ void setup() {
 
   setupWebServer();
 
+  // Touch initialization: must happen AFTER display init and web server setup
+  // Add a small delay to ensure SPI bus is stable
+  delay(100);
   tft.setTouchCalibrate(nullptr);
 
   drawClockScreen();
