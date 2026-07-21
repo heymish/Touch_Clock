@@ -75,7 +75,7 @@ public:
       cfg.y_max = 320;
       
       // Touch uses independent pins per LCDWIKI spec
-      cfg.spi_host = FSPI_HOST;  // Use FSPI (SPI0) for touch - separate from display VSPI
+      cfg.spi_host = SPI2_HOST;  // Use SPI2_HOST for touch - separate from display VSPI
       cfg.pin_cs = 33;     // GPIO33 - XPT2046 CS
       cfg.pin_int = 36;    // GPIO36 - XPT2046 interrupt
       cfg.pin_sclk = 25;   // GPIO25 - Touch SCLK
