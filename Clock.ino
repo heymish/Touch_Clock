@@ -4,7 +4,7 @@
 #include <WebServer.h>
 #include <Preferences.h>
 #include <time.h>
-#include <ArduinoOTA.h>
+//#include <ArduinoOTA.h>
 #include "LGFX_Config.h"
 
 // Project files:
@@ -45,6 +45,7 @@ struct WeatherData {
   float rainSum;
   int precipProb;
   String updatedAt;
+  float tempCurrent;
 };
 
 LGFX tft;
@@ -62,6 +63,7 @@ const unsigned long WEATHER_INTERVAL_MS = 60UL * 60UL * 1000UL;
 const unsigned long NTP_RETRY_INTERVAL_MS = 10UL * 60UL * 1000UL;
 const unsigned long BRIGHTNESS_CHECK_INTERVAL_MS = 60UL * 1000UL;
 
+//To  be removed
 const char* OTA_HOSTNAME = "ESP32-Clock";
 const char* OTA_PASSWORD = "";   // Optional. Leave bl
 
@@ -69,6 +71,10 @@ unsigned long lastScreenUpdate = 0;
 unsigned long lastWeatherUpdate = 0;
 unsigned long lastNtpRetry = 0;
 unsigned long lastBrightnessCheck = 0;
+
+bool showWeather = true;
+unsigned long lastTouchTime = 0;
+const unsigned long TOUCH_DEBOUNCE_MS = 300;
 
 // Functions implemented in other project files
 void drawBootScreen(const String& message);
@@ -78,6 +84,8 @@ void applyBrightness();
 void invalidateDisplayCache();
 bool fetchWeather();
 void setupWebServer();
+
+void handleScreenTouch();
 
 void applyRotation() {
   settings.rotation = constrain(settings.rotation, 0, 3);
@@ -130,62 +138,63 @@ bool hasValidTime() {
 }
 
 
-void setupOTA() {
-  ArduinoOTA.setHostname(OTA_HOSTNAME);
+// void setupOTA() {
+//   ArduinoOTA.setHostname(OTA_HOSTNAME);
 
-  if (strlen(OTA_PASSWORD) > 0) {
-    ArduinoOTA.setPassword(OTA_PASSWORD);
-  }
+//   if (strlen(OTA_PASSWORD) > 0) {
+//     ArduinoOTA.setPassword(OTA_PASSWORD);
+//   }
 
-  ArduinoOTA.onStart([](){
-    drawStatusScreen("OTA Update", "Starting...");
-    Serial.println("OTA started");
-  });
+//   ArduinoOTA.onStart([](){
+//     drawStatusScreen("OTA Update", "Starting...");
+//     Serial.println("OTA started");
+//   });
 
-  ArduinoOTA.onEnd([](){
-    Serial.println("\nOTA complete");
-  });
+//   ArduinoOTA.onEnd([](){
+//     Serial.println("\nOTA complete");
+//   });
 
-  ArduinoOTA.onProgress([](unsigned int progress,unsigned int total) {
-    static unsigned long lastUpdate = 0;
+//   ArduinoOTA.onProgress([](unsigned int progress,unsigned int total) {
+//     static unsigned long lastUpdate = 0;
 
-    if (millis() - lastUpdate > 500) {
-      lastUpdate = millis();
+//     if (millis() - lastUpdate > 500) {
+//       lastUpdate = millis();
 
-      int percent = (progress * 100) / total;
+//       int percent = (progress * 100) / total;
 
-      tft.fillRect(20, 150, 280, 30, TFT_BLACK);
-      tft.setTextColor(TFT_GREEN, TFT_BLACK);
-      tft.setTextDatum(middle_center);
-      tft.drawString(
-        String("Updating ") + String(percent) + "%",
-        160, 165,
-        &fonts::Font2
-      );
-    }
+//       tft.fillRect(20, 150, 280, 30, TFT_BLACK);
+//       tft.setTextColor(TFT_GREEN, TFT_BLACK);
+//       tft.setTextDatum(middle_center);
+//       tft.drawString(
+//         String("Updating ") + String(percent) + "%",
+//         160, 165,
+//         &fonts::Font2
+//       );
+//       Serial.printf("OTA Progress: %u%%\r", percent);
+//     }
 
-    Serial.printf("OTA Progress: %u%%\r", percent);
-  });
+    
+//   });
 
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("OTA Error[%u]\n", error);
+//   ArduinoOTA.onError([](ota_error_t error) {
+//     Serial.printf("OTA Error[%u]\n", error);
 
-    String message = "Error";
+//     String message = "Error";
 
-    if (error == OTA_AUTH_ERROR) message = "Auth failed";
-    else if (error == OTA_BEGIN_ERROR) message = "Begin failed";
-    else if (error == OTA_CONNECT_ERROR) message = "Connect failed";
-    else if (error == OTA_RECEIVE_ERROR) message = "Receive failed";
-    else if (error == OTA_END_ERROR) message = "End failed";
+//     if (error == OTA_AUTH_ERROR) message = "Auth failed";
+//     else if (error == OTA_BEGIN_ERROR) message = "Begin failed";
+//     else if (error == OTA_CONNECT_ERROR) message = "Connect failed";
+//     else if (error == OTA_RECEIVE_ERROR) message = "Receive failed";
+//     else if (error == OTA_END_ERROR) message = "End failed";
 
-    drawStatusScreen("OTA Failed", message);
-  });
+//     drawStatusScreen("OTA Failed", message);
+//   });
 
-  ArduinoOTA.begin();
+//   ArduinoOTA.begin();
 
-  Serial.print("OTA Ready: ");
-  Serial.println(WiFi.localIP());
-}
+//   Serial.print("OTA Ready: ");
+//   Serial.println(WiFi.localIP());
+// }
 
 
 void setupTime() {
@@ -234,6 +243,18 @@ bool otaAvailable() {
 }
 
 
+void handleScreenTouch(){
+  if (tft.getTouch(nullptr)){
+    unsigned long now = millis();
+    if (now - lastTouchTime > TOUCH_DEBOUNCE_MS) {
+      lastTouchTime = now;
+      showWeather = !showWeather;
+      invalidateDisplayCache(); //Force full redraw
+      Serial.println(showWeather ? "Switch to weather view" : "Switch to time-only view");
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(200);
@@ -264,9 +285,10 @@ void setup() {
   startWiFi();
 
   
-  if (otaAvailable()) {
-    	setupOTA();
-  }
+
+  // if (otaAvailable()) {
+  //   	setupOTA();
+  // }
 
 	
   setupTime();
@@ -274,18 +296,23 @@ void setup() {
   lastWeatherUpdate = millis();
 
   setupWebServer();
+
+  tft.setTouchCalibrate(nullptr);
+
   drawClockScreen();
 }
 
 void loop() {
 
   
-	if (otaAvailable()) {
-    	ArduinoOTA.handle();
-	}
+	// if (otaAvailable()) {
+  //   	ArduinoOTA.handle();
+	// }
 
 	
   server.handleClient();
+
+  handleScreenTouch();
 
   unsigned long now = millis();
 
