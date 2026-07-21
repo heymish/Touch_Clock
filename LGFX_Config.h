@@ -1,3 +1,4 @@
+//#include "lgfx/v1/touch/Touch_XPT2046.hpp"
 #pragma once
 
 #include <Arduino.h>
@@ -14,6 +15,7 @@
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel;
   lgfx::Bus_SPI _bus;
+  lgfx::Touch_XPT2046 _touch;
 
 public:
   LGFX(void) {
@@ -63,6 +65,22 @@ public:
       cfg.bus_shared = false;
 
       _panel.config(cfg);
+    }
+
+    {
+      auto cfg = _touch.config();
+
+      cfg.x_min = 0;
+      cfg.x_max = 240;
+      cfg.y_min = 0;
+      cfg.y_max = 320;
+      cfg.pin_cs = 4;
+      cfg.pin_int = -1;
+      cfg.bus_shared = true;
+      cfg.freq = 2500000;
+
+      _touch.config(cfg);
+      _panel.setTouch(&_touch);
     }
 
     setPanel(&_panel);
