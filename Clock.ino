@@ -243,17 +243,25 @@ bool otaAvailable() {
 }
 
 
-void handleScreenTouch(){
-  if (tft.getTouch(nullptr)){
+
+void handleScreenTouch() {
+  uint16_t x, y;
+
+  if (tft.getTouch(&x, &y)) {
     unsigned long now = millis();
+
     if (now - lastTouchTime > TOUCH_DEBOUNCE_MS) {
       lastTouchTime = now;
+
       showWeather = !showWeather;
-      invalidateDisplayCache(); //Force full redraw
+      invalidateDisplayCache(); // Force full redraw
+
+      Serial.printf("Touch detected at X=%u, Y=%u\n", x, y);
       Serial.println(showWeather ? "Switch to weather view" : "Switch to time-only view");
     }
   }
 }
+
 
 void setup() {
   Serial.begin(115200);
@@ -297,7 +305,7 @@ void setup() {
 
   setupWebServer();
 
-  tft.setTouchCalibrate(nullptr);
+  //tft.setTouchCalibrate(nullptr);
 
   drawClockScreen();
 }
