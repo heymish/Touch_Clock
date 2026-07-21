@@ -6,7 +6,7 @@
 
 // LovyanGFX configuration for LCDWiki E32R28T-1 / ESP32E 240x320 board
 // Display: ST7789 on VSPI (verified working)
-// Touch: XPT2046 will use independent SPI on GPIO25/32/39/33
+// Touch: XPT2046 on SPI2 - with safe pin configuration
 
 #define TFT_BL_PIN 21
 
@@ -75,15 +75,16 @@ public:
       cfg.y_max = 320;
       
       // Touch uses independent pins per LCDWIKI spec
-      cfg.spi_host = SPI2_HOST;  // Use SPI2_HOST for touch - separate from display VSPI
-      cfg.pin_cs = 33;     // GPIO33 - XPT2046 CS
-      cfg.pin_int = 36;    // GPIO36 - XPT2046 interrupt
-      cfg.pin_sclk = 25;   // GPIO25 - Touch SCLK
-      cfg.pin_mosi = 32;   // GPIO32 - Touch MOSI
-      cfg.pin_miso = 39;   // GPIO39 - Touch MISO
+      cfg.spi_host = SPI2_HOST;  // Touch on SPI2
+      cfg.pin_cs = 33;           // GPIO33 - XPT2046 CS
+      cfg.pin_int = 36;          // GPIO36 - XPT2046 interrupt (input only)
+      cfg.pin_sclk = 25;         // GPIO25 - Touch SCLK
+      cfg.pin_mosi = 32;         // GPIO32 - Touch MOSI
+      cfg.pin_miso = 39;         // GPIO39 - Touch MISO
       
-      cfg.bus_shared = false;  // Separate SPI bus entirely
-      cfg.freq = 2500000;
+      cfg.bus_shared = false;
+      cfg.freq = 1000000;        // Reduced to 1MHz for stability
+      cfg.offset_rotation = 0;
 
       _touch.config(cfg);
       _panel.setTouch(&_touch);
